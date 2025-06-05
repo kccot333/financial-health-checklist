@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Googler Financial Health Checklist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4f46e5;
+            animation: spin 1s ease infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(360deg); }
+            100% { transform: rotate(0deg); }
+        }
+        .action-card ul {
+            list-style-position: outside;
+            padding-left: 1.25rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
+    <div id="app-container" class="w-full max-w-3xl mx-auto">
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="bg-white p-8 rounded-2xl shadow-lg text-center fade-in">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">U.S. Googler Financial Health Check-In</h1>
+            <p class="text-gray-600 mb-6">Take this 2-minute assessment to get a personalized checklist and AI-powered insights.</p>
+            <button id="start-button" class="bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors shadow-md">
+                Start Assessment
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <div class="bg-white p-8 rounded-2xl shadow-lg fade-in">
+                <div class="mb-6">
+                    <p id="progress-text" class="text-sm text-gray-500 mb-2"></p>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300"></div>
+                    </div>
+                </div>
+                <h2 id="question-text" class="text-2xl font-semibold text-gray-900 mb-6"></h2>
+                <div id="options-container" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="hidden">
+             <div class="bg-white p-8 rounded-2xl shadow-lg text-left fade-in">
+                <h1 class="text-3xl font-bold text-gray-900 mb-4">Your Personalized Checklist</h1>
+                <p class="text-gray-600 mb-8">Here are your recommended action items, based on your answers.</p>
+                <div id="results-content" class="space-y-6"></div>
+                
+                <!-- Gemini API Section -->
+                <div id="gemini-section" class="hidden mt-8 text-center border-t pt-8">
+                     <h2 class="text-2xl font-bold text-gray-900 mb-2">Want to Go Deeper?</h2>
+                     <p class="text-gray-600 mb-6">Get personalized suggestions and explanations for your top priorities, powered by Gemini.</p>
+                    <button id="gemini-button" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center mx-auto">
+                        <span class="mr-2">✨</span> Get AI-Powered Insights
+                    </button>
+                    <div id="gemini-loader" class="hidden mt-6">
+                        <div class="spinner"></div>
+                        <p class="text-gray-600 mt-2">Generating your personalized advice...</p>
+                    </div>
+                    <div id="gemini-result" class="hidden mt-6 text-left bg-indigo-50 border-l-4 border-indigo-500 p-6 rounded-r-lg">
+                        <h3 class="font-bold text-lg text-indigo-900 mb-2">Your AI-Powered Insights</h3>
+                        <div id="gemini-content" class="text-indigo-800 space-y-3"></div>
+                    </div>
+                     <div id="gemini-error" class="hidden mt-6 text-left bg-red-50 border-l-4 border-red-500 p-6 rounded-r-lg">
+                        <h3 class="font-bold text-lg text-red-900 mb-2">Oops!</h3>
+                        <p class="text-red-800">We couldn't generate insights right now. Please try again later.</p>
+                    </div>
+                </div>
+
+                 <div class="text-center mt-8 border-t pt-6">
+                     <button id="restart-button" class="bg-gray-200 text-gray-700 font-semibold py-3 px-8 rounded-lg hover:bg-gray-300 transition-colors">
+                        Start Over
+                    </button>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA AND STATE MANAGEMENT ---
+        const questions = [
+             {
+                id: 'q1',
+                text: 'Have you reviewed or set beneficiaries for **all** of your Alphabet financial accounts (Google 401k, HSA, and broker accounts) within the last year?',
+                options: [
+                    { value: 'A', text: 'Yes, all of them.' },
+                    { value: 'B', text: 'Some, but not all.' },
+                    { value: 'C', text: 'No, I haven\'t.' },
+                    { value: 'D', text: 'I\'m not sure.' }
+                ]
+            },
+            {
+                id: 'q2',
+                text: 'Are you confident you are on track to contribute enough to your Google 401k to receive the **full Google match** this year?',
+                options: [
+                    { value: 'A', text: 'Yes, I\'m on track.' },
+                    { value: 'B', text: 'No, I\'m not.' },
+                    { value: 'C', text: 'I\'m not sure how to check.' }
+                ]
+            },
+            {
+                id: 'q3',
+                text: 'If you are enrolled in the gHIP, are you **investing your Health Savings Account (HSA) funds** for long-term growth?',
+                options: [
+                    { value: 'A', text: 'Yes, my HSA funds are invested.' },
+                    { value: 'B', text: 'No, my HSA funds are sitting in cash.' },
+                    { value: 'C', text: 'I\'m not enrolled in the gHIP / don\'t have an HSA.' }
+                ]
+            },
+            {
+                id: 'q4',
+                text: 'Do you have a clear financial plan for handling your **GSU vesting, bonus, and other savings goals** for the year?',
+                options: [
+                    { value: 'A', text: 'Yes, I have a clear plan.' },
+                    { value: 'B', text: 'I have a general idea, but could use some guidance.' },
+                    { value: 'C', text: 'No, I don\'t have a plan.' }
+                ]
+            },
+            {
+                id: 'q5',
+                text: 'Do you currently have **student loan debt**?',
+                options: [
+                    { value: 'A', text: 'Yes' },
+                    { value: 'B', 'text': 'No' }
+                ]
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        const userAnswers = {};
+
+        // --- DOM ELEMENTS ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const startButton = document.getElementById('start-button');
+        const restartButton = document.getElementById('restart-button');
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const resultsContent = document.getElementById('results-content');
+        const geminiSection = document.getElementById('gemini-section');
+        const geminiButton = document.getElementById('gemini-button');
+        const geminiLoader = document.getElementById('gemini-loader');
+        const geminiResult = document.getElementById('gemini-result');
+        const geminiContent = document.getElementById('gemini-content');
+        const geminiError = document.getElementById('gemini-error');
+        
+        // --- EVENT LISTENERS ---
+        startButton.addEventListener('click', startQuiz);
+        restartButton.addEventListener('click', () => location.reload());
+        geminiButton.addEventListener('click', getAIGeneratedAdvice);
+
+        // --- FUNCTIONS ---
+        function startQuiz() {
+            startScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            renderQuestion();
+        }
+        
+        function renderQuestion() {
+            const question = questions[currentQuestionIndex];
+            progressText.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+            progressBar.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
+            questionText.innerHTML = question.text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-600">$1</strong>');
+            
+            optionsContainer.innerHTML = '';
+            question.options.forEach(option => {
+                const button = document.createElement('button');
+                button.className = 'w-full text-left p-4 border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-500 transition-all';
+                button.textContent = option.text;
+                button.onclick = () => handleAnswer(question.id, option.value);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function handleAnswer(questionId, answerValue) {
+            userAnswers[questionId] = answerValue;
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                renderQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            quizScreen.classList.add('hidden');
+            resultsScreen.classList.remove('hidden');
+            
+            const actionCards = [];
+
+            // --- Build Action Cards ---
+            if (['B', 'C', 'D'].includes(userAnswers.q1)) {
+                 actionCards.push(generateActionCard(
+                     'Protect Your Future & Your Loved Ones',
+                     'One of the most critical steps is ensuring your assets go to the right people. It only takes a few minutes and protects your loved ones.',
+                     `<ul>
+                        <li><strong>Alphabet Shares:</strong> Assign a beneficiary for your broker account.
+                            <br><a href="#" class="text-blue-600 hover:underline">Morgan Stanley guide</a> | <a href="#" class="text-blue-600 hover:underline">Schwab guide</a>
+                        </li>
+                        <li><strong>Google 401k:</strong> Protect your retirement savings.
+                           <br><a href="#" class="text-blue-600 hover:underline">View 401k beneficiary guide</a>
+                        </li>
+                         <li><strong>HSA Account:</strong> If enrolled in gHIP, ensure your beneficiary is up to date.
+                           <br><a href="#" class="text-blue-600 hover:underline">Update at go/gbenefits</a>
+                        </li>
+                     </ul>`
+                 ));
+            }
+            if (['B', 'C'].includes(userAnswers.q2)) {
+                 actionCards.push(generateActionCard(
+                    'Maximize Your 401k & Google\'s Match',
+                    'Don\'t leave free money on the table! Google matches 50% of your contributions, up to an **$11,750 match** from Google for the year.',
+                    `<a href="#" class="font-bold text-blue-600 hover:underline">Use the Retirement Savings Maximizer Tool &rarr;</a>
+                     <p class="text-sm text-gray-600 mt-2">Get personalized insights to track your progress and optimize your savings.</p>`
+                 ));
+            }
+            if (userAnswers.q3 === 'B') {
+                 actionCards.push(generateActionCard(
+                    'Make the Most of Your HSA',
+                    'Your Health Savings Account has a powerful triple tax advantage (tax-deductible contributions, tax-free growth, and tax-free withdrawals for medical expenses).',
+                     `<ul>
+                        <li><strong>Invest Your Contributions:</strong> For long-term growth, consider investing your funds.
+                            <br><a href="#" class="text-blue-600 hover:underline">Manage investments with HealthEquity Advisor</a>
+                        </li>
+                        <li><strong>Review Contributions & Statements:</strong> Are you on track to meet your goal?
+                           <br><a href="#" class="text-blue-600 hover:underline">Make changes at go/gbenefits</a>
+                        </li>
+                     </ul>`
+                 ));
+            }
+            if (['B', 'C'].includes(userAnswers.q4)) {
+                 actionCards.push(generateActionCard(
+                    'Get Expert Guidance & Build Your Strategy',
+                    'Managing your total compensation (salary, GSUs, bonus) can be complex. Google provides free, confidential access to financial experts.',
+                     `<ul>
+                        <li><strong>Schedule a Check-in with Ayco:</strong> Get custom coaching on managing your money, preparing for retirement, and handling GSUs.
+                            <br><a href="#" class="text-blue-600 hover:underline">Book a mid-year review with Ayco &rarr;</a>
+                        </li>
+                        <li><strong>Review Tax Withholding:</strong> An Ayco advisor can help you determine if you should adjust your withholding for supplemental income.
+                           <br><a href="#" class="text-blue-600 hover:underline">View withholding guide &rarr;</a>
+                        </li>
+                     </ul>`
+                 ));
+            }
+             if (userAnswers.q5 === 'A') {
+                 actionCards.push(generateActionCard(
+                    'Manage Your Student Loan Debt',
+                    'Take control of your student loans with the resources Google provides to create a repayment strategy.',
+                    `<a href="#" class="font-bold text-blue-600 hover:underline">Explore Your Options with Gradifi &rarr;</a>`
+                 ));
+            }
+
+            // --- Render Results ---
+            if (actionCards.length > 0) {
+                 resultsContent.innerHTML = actionCards.join('');
+                 geminiSection.classList.remove('hidden');
+            } else {
+                 resultsContent.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-6 rounded-r-lg"><h3 class="text-xl font-bold text-green-800 mb-2">Great work!</h3><p class="text-green-700">Based on your answers, you're on top of your financial health. No urgent actions were flagged.</p></div>`;
+                 geminiSection.classList.add('hidden');
+            }
+        }
+        
+        function generateActionCard(title, description, contentHtml) {
+            return `
+                <div class="action-card border border-gray-200 p-6 rounded-xl bg-white shadow-sm">
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">${title}</h3>
+                    <p class="text-gray-600 mb-4">${description}</p>
+                    <div class="mt-4 text-gray-700 space-y-3">
+                        ${contentHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function getAIGeneratedAdvice() {
+            geminiButton.classList.add('hidden');
+            geminiLoader.classList.remove('hidden');
+            geminiResult.classList.add('hidden');
+            geminiError.classList.add('hidden');
+
+            let promptContext = [];
+            if (['B', 'C', 'D'].includes(userAnswers.q1)) promptContext.push("has not reviewed all their beneficiaries recently.");
+            if (['B', 'C'].includes(userAnswers.q2)) promptContext.push("is not on track to get the full Google 401k match.");
+            if (userAnswers.q3 === 'B') promptContext.push("is not investing their HSA funds.");
+            if (['B', 'C'].includes(userAnswers.q4)) promptContext.push("does not have a clear financial plan for their GSUs and bonus.");
+            if (userAnswers.q5 === 'A') promptContext.push("has student loan debt.");
+            if (promptContext.length === 0) promptContext.push("is doing great but is looking for general tips.");
+
+            const prompt = `
+                You are a helpful and encouraging financial wellness assistant for a Google employee.
+                The user has the following profile: ${promptContext.join('; ')}.
+                Based on this, provide a short, actionable, and encouraging summary (2-3 paragraphs) of their top 1-2 financial priorities.
+                Do not give specific investment advice (e.g., "buy this stock").
+                Focus on explaining the 'why' behind the recommendations in simple terms.
+                Encourage them to use Google's internal resources like Ayco for personalized planning.
+                Format the output as simple HTML paragraphs.
+            `;
+            
+            try {
+                const apiKey = ""; // Leave empty
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                    geminiContent.innerHTML = result.candidates[0].content.parts[0].text;
+                    geminiResult.classList.remove('hidden');
+                } else {
+                    throw new Error("No content received from API.");
+                }
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                geminiError.classList.remove('hidden');
+            } finally {
+                geminiLoader.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
